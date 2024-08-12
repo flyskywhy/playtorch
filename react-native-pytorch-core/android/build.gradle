@@ -235,9 +235,7 @@ def configureCMakeTaskName = Integer.parseInt(appRnMinorVersion) < 68 ? "externa
 tasks.whenTaskAdded { task ->
   if (task.name.contains(configureCMakeTaskName)) {
     task.dependsOn(extractJNIFiles)
-    if (Integer.parseInt(appRnMinorVersion) < 71) {
-      task.dependsOn(extractAARHeaders)
-      task.dependsOn(extractAARForNativeBuild)
-    }
+    task.dependsOn(extractAARHeaders)
+    task.dependsOn(extractAARForNativeBuild)
   }
 }
