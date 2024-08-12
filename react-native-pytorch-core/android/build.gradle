@@ -47,6 +47,12 @@ android {
   // ref to https://github.com/pytorch/pytorch/issues/51020#issuecomment-1600272599
   ndkVersion "21.4.7075529"
 
+  if (Integer.parseInt(appRnMinorVersion) >= 71) {
+    buildFeatures {
+      prefab true
+    }
+  }
+
   defaultConfig {
     minSdkVersion safeExtGet('PyTorchCore_minSdkVersion', 21)
     targetSdkVersion safeExtGet('PyTorchCore_targetSdkVersion', 30)
@@ -73,12 +79,15 @@ android {
   lintOptions {
    disable 'GradleCompatible'
   }
-  compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_8
-    targetCompatibility JavaVersion.VERSION_1_8
+  if (Integer.parseInt(appRnMinorVersion) < 71) {
+    compileOptions {
+      sourceCompatibility JavaVersion.VERSION_1_8
+      targetCompatibility JavaVersion.VERSION_1_8
+    }
   }
   externalNativeBuild {
     cmake {
+      // version "3.22.1"
       path "CMakeLists.txt"
     }
   }
@@ -120,33 +129,35 @@ dependencies {
     }
   }
 
-  //noinspection GradleDynamicVersion
   if (Integer.parseInt(appRnMinorVersion) < 71) {
       api "com.facebook.react:react-native:+"  // From node_modules
   } else {
+      //noinspection GradleDynamicVersion
       implementation("com.facebook.react:react-android")
   }
 
-  //noinspection GradleDynamicVersion
-  extractHeaders("com.facebook.fbjni:fbjni:+:headers")
-  //noinspection GradleDynamicVersion
-  extractJNI("com.facebook.fbjni:fbjni:+")
+  if (Integer.parseInt(appRnMinorVersion) < 71) {
+    //noinspection GradleDynamicVersion
+    extractHeaders("com.facebook.fbjni:fbjni:+:headers")
+    //noinspection GradleDynamicVersion
+    extractJNI("com.facebook.fbjni:fbjni:+")
 
-  def nodeModules = "${rootDir}/../node_modules"
+    def nodeModules = "${rootDir}/../node_modules"
 
-  // For now we use the release version of the jni library
-  // we will look back on this once we figure out how to
-  // get the buildType duing configuration stage
-  def buildType = "release"
+    // For now we use the release version of the jni library
+    // we will look back on this once we figure out how to
+    // get the buildType duing configuration stage
+    def buildType = "release"
 
-  if (Integer.parseInt(appRnMinorVersion) < 69) {
-      def rnAAR = fileTree("${nodeModules}/react-native/android").matching({ it.include "**/**/*.aar" }).singleFile
-      extractJNI(files(rnAAR))
-  } else if (Integer.parseInt(appRnMinorVersion) < 71) {
-      // React Native 0.69
-      def rnAarMatcher = "**/react-native/**/*${buildType}.aar"
-      def rnAAR = fileTree("${nodeModules}/react-native/android").matching({ it.include rnAarMatcher }).singleFile
-      extractJNI(files(rnAAR))
+    if (Integer.parseInt(appRnMinorVersion) < 69) {
+        def rnAAR = fileTree("${nodeModules}/react-native/android").matching({ it.include "**/**/*.aar" }).singleFile
+        extractJNI(files(rnAAR))
+    } else if (Integer.parseInt(appRnMinorVersion) < 71) {
+        // React Native 0.69
+        def rnAarMatcher = "**/react-native/**/*${buildType}.aar"
+        def rnAAR = fileTree("${nodeModules}/react-native/android").matching({ it.include rnAarMatcher }).singleFile
+        extractJNI(files(rnAAR))
+    }
   }
 
   extractForNativeBuild("org.pytorch:pytorch_android_lite:${pytorchLiteVersion}")
@@ -223,8 +234,10 @@ task extractAARForNativeBuild {
 def configureCMakeTaskName = Integer.parseInt(appRnMinorVersion) < 68 ? "externalNativeBuild" : "configureCMake"
 tasks.whenTaskAdded { task ->
   if (task.name.contains(configureCMakeTaskName)) {
-    task.dependsOn(extractAARHeaders)
     task.dependsOn(extractJNIFiles)
-    task.dependsOn(extractAARForNativeBuild)
+    if (Integer.parseInt(appRnMinorVersion) < 71) {
+      task.dependsOn(extractAARHeaders)
+      task.dependsOn(extractAARForNativeBuild)
+    }
   }
 }

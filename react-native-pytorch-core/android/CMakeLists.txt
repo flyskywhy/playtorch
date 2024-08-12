@@ -3,17 +3,31 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+project(PlayTorch)
 cmake_minimum_required(VERSION 3.4.1)
 
 set (CMAKE_VERBOSE_MAKEFILE ON)
 
 # This should be matched with the Unit Test Build. Please keep them in sync. See ../cxx/test/CMakeLists.txt
 set (CMAKE_CXX_STANDARD 14)
-set (CMAKE_CXX_FLAGS "-DFOLLY_NO_CONFIG=1 -DFOLLY_HAVE_CLOCK_GETTIME=1 -DFOLLY_HAVE_MEMRCHR=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_MOBILE=1 -DON_ANDROID -DONANDROID")
+
+if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 71)
+        include("${NODE_MODULES_DIR}/react-native/ReactAndroid/cmake-utils/folly-flags.cmake")
+        add_compile_options(${folly_FLAGS})
+else()
+        set (CMAKE_CXX_FLAGS "-DFOLLY_NO_CONFIG=1 -DFOLLY_HAVE_CLOCK_GETTIME=1 -DFOLLY_HAVE_MEMRCHR=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_MOBILE=1 -DON_ANDROID -DONANDROID")
+endif()
 
 set (PACKAGE_NAME "torchlive")
 set (BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
-set (RN_SO_DIR ${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/first-party/react/jni)
+
+if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 71)
+        # Consume shared libraries and headers from prefabs
+        find_package(fbjni REQUIRED CONFIG)
+        find_package(ReactAndroid REQUIRED CONFIG)
+else()
+        set (RN_SO_DIR ${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/first-party/react/jni)
+endif()
 
 # PyTorch Core shared
 
@@ -60,25 +74,43 @@ add_library(
 
 # includes
 
-file (GLOB LIBFBJNI_INCLUDE_DIR "${BUILD_DIR}/fbjni-*-headers.jar/")
 file (GLOB PYTORCH_INCLUDE_DIRS "${BUILD_DIR}/pytorch_android_lite*.aar/headers")
 
-target_include_directories(
-        ${PACKAGE_NAME}
-        PRIVATE
-        "${LIBFBJNI_INCLUDE_DIR}"
-        "${NODE_MODULES_DIR}/react-native/React"
-        "${NODE_MODULES_DIR}/react-native/React/Base"
-        "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni"
-        "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/java/com/facebook/react/turbomodule/core/jni"
-        "${NODE_MODULES_DIR}/react-native/ReactCommon"
-        "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
-        "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
-        "${NODE_MODULES_DIR}/react-native/ReactCommon/runtimeexecutor"
-        "${PYTORCH_INCLUDE_DIRS}"
-        "../cxx/src"
-        "src/main/cpp"
-)
+if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 71)
+        target_include_directories(
+                ${PACKAGE_NAME}
+                PRIVATE
+                "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/react/turbomodule"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/react/renderer/graphics/platform/cxx"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/runtimeexecutor"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/yoga"
+                "${PYTORCH_INCLUDE_DIRS}"
+                "../cxx/src"
+                "src/main/cpp"
+        )
+else()
+        file (GLOB LIBFBJNI_INCLUDE_DIR "${BUILD_DIR}/fbjni-*-headers.jar/")
+
+        target_include_directories(
+                ${PACKAGE_NAME}
+                PRIVATE
+                "${LIBFBJNI_INCLUDE_DIR}"
+                "${NODE_MODULES_DIR}/react-native/React"
+                "${NODE_MODULES_DIR}/react-native/React/Base"
+                "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni"
+                "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/java/com/facebook/react/turbomodule/core/jni"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
+                "${NODE_MODULES_DIR}/react-native/ReactCommon/runtimeexecutor"
+                "${PYTORCH_INCLUDE_DIRS}"
+                "../cxx/src"
+                "src/main/cpp"
+        )
+endif()
 
 # find libraries
 
@@ -90,20 +122,21 @@ find_library(
         log
 )
 
-find_library(
-        FBJNI_LIBRARY
-        fbjni
-        PATHS ${LIBRN_DIR}
-        NO_CMAKE_FIND_ROOT_PATH
-)
+if(${REACT_NATIVE_MINOR_VERSION} LESS 71)
+        find_library(
+                FBJNI_LIBRARY
+                fbjni
+                PATHS ${LIBRN_DIR}
+                NO_CMAKE_FIND_ROOT_PATH
+        )
 
-find_library(
-        REACT_NATIVE_JNI_LIB
-        reactnativejni
-        PATHS ${LIBRN_DIR}
-        NO_CMAKE_FIND_ROOT_PATH
-)
-
+        find_library(
+                REACT_NATIVE_JNI_LIB
+                reactnativejni
+                PATHS ${LIBRN_DIR}
+                NO_CMAKE_FIND_ROOT_PATH
+        )
+endif()
 
 find_library(
         PYTORCH_LIBRARY
@@ -112,8 +145,21 @@ find_library(
         NO_CMAKE_FIND_ROOT_PATH
 )
 
-# For RN 0.66+, use the distributed libjsi.so
-if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 66)
+if(${REACT_NATIVE_MINOR_VERSION} GREATER_EQUAL 71)
+        target_link_libraries(
+                ${PACKAGE_NAME}
+                ReactAndroid::folly_runtime
+                ReactAndroid::glog
+                ReactAndroid::jsi
+                ReactAndroid::reactnativejni
+                fbjni::fbjni
+                ${PYTORCH_LIBRARY}
+        )
+elseif(${REACT_NATIVE_MINOR_VERSION} LESS 66)
+        # JSI lib didn't exist on RN 0.65 and before. Simply omit it.
+        set (JSI_LIB "")
+else()
+        # For RN 0.66+, use the distributed libjsi.so
         find_library(
                 JSI_LIB
                 jsi
