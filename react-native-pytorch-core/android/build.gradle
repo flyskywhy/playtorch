@@ -41,6 +41,12 @@ def safeExtGet(prop, fallback) {
 android {
   compileSdkVersion safeExtGet('PyTorchCore_compileSdkVersion', Integer.parseInt(appRnMinorVersion) < 68 ? 30 : 31)
   buildToolsVersion safeExtGet('PyTorchCore_buildToolsVersion', Integer.parseInt(appRnMinorVersion) < 68 ? '30.0.2' : '31.0.0')
+
+  // ndkVersion getExtOrDefault('ndkVersion')
+  // use below because ndk 22+ version will cause `ld: error: found local symbol '__end__'`
+  // ref to https://github.com/pytorch/pytorch/issues/51020#issuecomment-1600272599
+  ndkVersion "21.4.7075529"
+
   defaultConfig {
     minSdkVersion safeExtGet('PyTorchCore_minSdkVersion', 21)
     targetSdkVersion safeExtGet('PyTorchCore_targetSdkVersion', 30)
