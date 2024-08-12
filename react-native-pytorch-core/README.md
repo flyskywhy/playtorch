@@ -18,6 +18,38 @@ Follow the [Getting Started guide](https://playtorch.dev/docs/tutorials/get-star
 
 The full documentation for PlayTorch can be found on our [website](https://playtorch.dev/).
 
+## Install
+```
+npm install react-native-playtorch
+```
+
+Modify `android/app/build.gradle`:
+```
+android {
+    ....
+    packagingOptions {
+        pickFirst '**/*.so'
+    }
+    ...
+}
+```
+Modify `android/gradle.properties`:
+```
+org.gradle.jvmargs=-Xmx4g
+```
+Modify `metro.config.js`:
+```
+const defaultAssetExts = require('metro-config/src/defaults/defaults')
+  .assetExts;
+
+module.exports = {
+  resolver: {
+    assetExts: [...defaultAssetExts, 'ptl'],
+  },
+};
+```
+
+
 ## Example Usage
 
 ```javascript
