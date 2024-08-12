@@ -93,7 +93,7 @@ tasks.whenTaskAdded { task ->
 
 dependencies {
     // Used to control the version of libfbjni.so packaged into the APK
-    extraJNILibs("com.facebook.fbjni:fbjni:0.2.2")
+    extraJNILibs("com.facebook.fbjni:fbjni:0.3.0")
 `,
   );
 
