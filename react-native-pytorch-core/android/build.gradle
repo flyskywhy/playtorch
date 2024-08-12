@@ -106,7 +106,13 @@ repositories {
 
 dependencies {
   def pytorchLiteVersion = '1.12.2'
-  implementation "org.pytorch:pytorch_android_lite:${pytorchLiteVersion}"
+  if (Integer.parseInt(appRnMinorVersion) < 71) {
+    implementation "org.pytorch:pytorch_android_lite:${pytorchLiteVersion}"
+  } else {
+    implementation ("org.pytorch:pytorch_android_lite:${pytorchLiteVersion}") {
+        exclude group:'com.facebook.fbjni', module: 'fbjni-java-only'
+    }
+  }
 
   //noinspection GradleDynamicVersion
   if (Integer.parseInt(appRnMinorVersion) < 71) {
