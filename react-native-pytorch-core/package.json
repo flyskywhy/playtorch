@@ -1,6 +1,6 @@
 {
   "name": "react-native-playtorch",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "PyTorch core library for React Native",
   "private": false,
   "main": "lib/commonjs/index",
