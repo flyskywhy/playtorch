@@ -28,6 +28,7 @@ Modify `android/app/build.gradle`:
 android {
     ....
     packagingOptions {
+        // doNotStrip "**/libc++_shared.so"
         pickFirst '**/*.so'
     }
     ...
@@ -49,6 +50,44 @@ module.exports = {
 };
 ```
 
+## Patch to fix `__emutls_get_address` crash on Android
+If `RN0.71+` and run crash on Android `java.lang.UnsatisfiedLinkError: dlopen failed: cannot locate symbol "__emutls_get_address" referenced by "/data/app/~~Bu6UWdRieDpDrpvvyvNNVQ==/com.foo.bar-w8nusksLnLfSCCsWG3cEkg==/lib/arm64/libfolly_runtime.so"`, you need (e.g. on Linux)
+```
+cd tools/android-sdk/ndk
+
+mv ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/origin_libc++_shared.so
+cp ./23.1.7779620/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/
+
+mv ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/origin_libc++_shared.so
+cp ./23.1.7779620/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/
+
+mv ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/origin_libc++_shared.so
+cp ./23.1.7779620/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/
+
+mv ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/origin_libc++_shared.so
+cp ./23.1.7779620/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so ./21.4.7075529/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/
+```
+The crash reason is, even the `libc++_shared.so` in `prefab`
+```
+readelf -s  ~/.gradle/caches/transforms-3/9915f55612e7d9d2d8676faa1872c696/transformed/jetified-react-android-0.71.6-debug/jni/arm64-v8a/libc++_shared.so | grep __emutls_get_address
+   374: 00000000000ec5bc   448 FUNC    WEAK   DEFAULT   16 __emutls_get_address
+```
+is `WEAK` not `LOCAL`, but with `pickFirst '**/*.so'`, the `libc++_shared.so` in `.apk` will be picked from `node_modules/react-native-playtorch/android/build/intermediates/library_jni/debug/jni/arm64-v8a/libc++_shared.so`, and
+```
+readelf -s node_modules/react-native-playtorch/android/build/intermediates/library_jni/debug/jni/arm64-v8a/libc++_shared.so | grep __emutls_get_address
+  3885: 00000000000b60a0   344 FUNC    LOCAL  DEFAULT   11 __emutls_get_address
+```
+is `LOCAL` not `WEAK`.
+
+If enable `doNotStrip "**/libc++_shared.so"` then extract the `libc++_shared.so` from `.apk`, use `readelf` you will also find it's `LOCAL` not `WEAK`.
+
+The `libfolly_runtime.so` will call `__emutls_get_address`, if it's `LOCAL`, then run into crash.
+
+The `__emutls_get_address` in `libc++_shared.so` of `NDK21.4.7075529` is `LOCAL`, and it's `WEAK` for `NDK23.1.7779620`.
+
+For now, `react-native-playtorch` only can be compiled in `NDK21.4.7075529`.
+
+So comes the patch above.
 
 ## Example Usage
 
